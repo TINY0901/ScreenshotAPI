@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  screenshot-api:
+    build: .
+    container_name: screenshot_api
+    restart: always
+    ports:
+      - "3050:3050"
+    # Giới hạn RAM (nếu cần thiết, Puppeteer khá tốn RAM)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 1G
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
