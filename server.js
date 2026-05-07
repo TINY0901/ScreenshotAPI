@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const puppeteer = require('puppeteer');
 
 const app = express();
@@ -101,6 +103,66 @@ app.get('/screenshot', async (req, res) => {
         }
     }
 });
+
+// New endpoint to capture screenshot, save as JPEG, and return link
+app.get('/screenshot-link', async (req, res) => {
+  const targetUrl = req.query.url;
+  const waitTime = parseInt(req.query.wait) || 5000;
+  const width = parseInt(req.query.width) || 1280;
+  const height = parseInt(req.query.height) || 800;
+
+  const clipX = parseInt(req.query.clipX);
+  const clipY = parseInt(req.query.clipY);
+  const clipW = parseInt(req.query.clipW);
+  const clipH = parseInt(req.query.clipH);
+
+  if (!targetUrl) {
+    return res.status(400).send("Lỗi: Thiếu tham số 'url'");
+  }
+  if (!browser) {
+    return res.status(503).send("Lỗi: Trình duyệt chưa sẵn sàng.");
+  }
+
+  let page;
+  try {
+    console.log(`\n[+] Đang xử lý yêu cầu chụp (link): ${targetUrl}`);
+    const startTime = Date.now();
+    page = await browser.newPage();
+    await page.setViewport({ width, height });
+    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    if (waitTime > 0) {
+      await new Promise(r => setTimeout(r, waitTime));
+    }
+    const screenshotOptions = { type: 'jpeg', quality: 80, fullPage: false };
+    if (!isNaN(clipX) && !isNaN(clipY) && !isNaN(clipW) && !isNaN(clipH)) {
+      screenshotOptions.clip = { x: clipX, y: clipY, width: clipW, height: clipH };
+    }
+    const filename = `screenshot_${Date.now()}.jpg`;
+    const filepath = path.join(screenshotsDir, filename);
+    screenshotOptions.path = filepath;
+    await page.screenshot(screenshotOptions);
+    const fileUrl = `${req.protocol}://${req.get('host')}/screenshots/${filename}`;
+    res.json({ url: fileUrl });
+    const timeTaken = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`[+] Saved screenshot ${filename} and responded after ${timeTaken}s`);
+  } catch (error) {
+    console.error(`[-] Lỗi khi xử lý ${targetUrl}:`, error.message);
+    res.status(500).send(`Lỗi chụp ảnh: ${error.message}`);
+  } finally {
+    if (page) {
+      await page.close().catch(e => console.error("Lỗi khi đóng tab", e));
+    }
+  }
+});
+
+// Serve saved screenshots as static files
+app.use('/screenshots', express.static(path.join(__dirname, 'screenshots')));
+
+// Ensure screenshots directory exists
+const screenshotsDir = path.join(__dirname, 'screenshots');
+if (!fs.existsSync(screenshotsDir)) {
+  fs.mkdirSync(screenshotsDir, { recursive: true });
+}
 
 app.listen(PORT, () => {
     console.log(`=========================================`);
