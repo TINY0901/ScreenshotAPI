@@ -33,9 +33,15 @@ app.get('/screenshot', async (req, res) => {
     const targetUrl = req.query.url;
     // Thời gian chờ để Dashboard load xong biểu đồ (mặc định 5s)
     const waitTime = parseInt(req.query.wait) || 5000;
-    // Kích thước ảnh
+    // Kích thước viewport ban đầu
     const width = parseInt(req.query.width) || 1280;
     const height = parseInt(req.query.height) || 800;
+
+    // Toạ độ và kích thước khung cắt (clip)
+    const clipX = parseInt(req.query.clipX);
+    const clipY = parseInt(req.query.clipY);
+    const clipW = parseInt(req.query.clipW);
+    const clipH = parseInt(req.query.clipH);
 
     if (!targetUrl) {
         return res.status(400).send("Lỗi: Thiếu tham số 'url'");
@@ -66,8 +72,17 @@ app.get('/screenshot', async (req, res) => {
         }
 
         console.log(`    - Đang chụp ảnh...`);
+        // Thiết lập cấu hình chụp
+        const screenshotOptions = { type: 'png', fullPage: false };
+        
+        // Nếu truyền vào toạ độ cắt ảnh, áp dụng cấu hình clip
+        if (!isNaN(clipX) && !isNaN(clipY) && !isNaN(clipW) && !isNaN(clipH)) {
+            screenshotOptions.clip = { x: clipX, y: clipY, width: clipW, height: clipH };
+            console.log(`    - Áp dụng khung cắt: x=${clipX}, y=${clipY}, w=${clipW}, h=${clipH}`);
+        }
+
         // Chụp ảnh trả về định dạng Buffer
-        const imageBuffer = await page.screenshot({ type: 'png', fullPage: false });
+        const imageBuffer = await page.screenshot(screenshotOptions);
 
         // Gửi ảnh về cho Node-RED
         res.set('Content-Type', 'image/png');
