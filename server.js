@@ -6,6 +6,11 @@ const puppeteer = require('puppeteer');
 const app = express();
 const PORT = 3050;
 
+// Cấu hình dọn dẹp ảnh cũ
+const MAX_SCREENSHOT_AGE = 24 * 60 * 60 * 1000; // 24 giờ (ms)
+const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 giờ chạy 1 lần (ms)
+
+
 let browser;
 
 // Khởi tạo Browser 1 lần duy nhất để tiết kiệm tài nguyên
@@ -163,6 +168,46 @@ const screenshotsDir = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(screenshotsDir)) {
   fs.mkdirSync(screenshotsDir, { recursive: true });
 }
+
+// Hàm dọn dẹp các file ảnh cũ
+function cleanupOldFiles() {
+    console.log(`[Cleanup] Đang kiểm tra và dọn dẹp ảnh cũ trong ${screenshotsDir}...`);
+    fs.readdir(screenshotsDir, (err, files) => {
+        if (err) {
+            console.error("[Cleanup] Không thể đọc thư mục screenshots:", err);
+            return;
+        }
+
+        const now = Date.now();
+        let deletedCount = 0;
+
+        files.forEach(file => {
+            const filePath = path.join(screenshotsDir, file);
+            fs.stat(filePath, (err, stats) => {
+                if (err) {
+                    console.error(`[Cleanup] Lỗi khi lấy thông tin file ${file}:`, err);
+                    return;
+                }
+
+                if (now - stats.mtimeMs > MAX_SCREENSHOT_AGE) {
+                    fs.unlink(filePath, (err) => {
+                        if (err) {
+                            console.error(`[Cleanup] Không thể xoá file ${file}:`, err);
+                        } else {
+                            deletedCount++;
+                        }
+                    });
+                }
+            });
+        });
+    });
+}
+
+// Chạy dọn dẹp định kỳ
+setInterval(cleanupOldFiles, CLEANUP_INTERVAL);
+// Chạy thử 1 lần ngay khi khởi động
+setTimeout(cleanupOldFiles, 5000);
+
 
 app.listen(PORT, () => {
     console.log(`=========================================`);
